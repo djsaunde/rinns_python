@@ -1,3 +1,5 @@
 tensorflow
 keras
 h5py
+scipy
+pillow
