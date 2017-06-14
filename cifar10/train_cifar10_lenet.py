@@ -1,4 +1,4 @@
-# Author: Ryan McCormick
+# @author Ryan McCormick, Dan Saunders
 # Slightly modified code modeled after: 
 # https://github.com/fchollet/keras/blob/master/examples/cifar10_cnn.py
 
@@ -13,18 +13,23 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
+from keras.callbacks import ModelCheckpoint
 
-train_path = '../work/training/cifar10/'
-if not os.path.isdir('../work/training/cifar10/'):
-	os.makedirs('../work/training/cifar10/')
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+
+train_path = os.path.join('..', 'work', 'training', 'cifar10_lenet'
+if not os.path.isdir(train_path):
+	os.makedirs(train_path)
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
-parser.add_argument('--hardware', type=str, default='cpu', help='cpu, gpu, or 2gpu currently supported.')
-parser.add_argument('--batch_size', type=int, default=100)
-parser.add_argument('--num_epochs', type=int, default=25)
+parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
+parser.add_argument('--batch_size', type=int, default=100, help='Number of training / validation examples per minibatch.')
+parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs (passes through training dataset) for which to train the network.')
+parser.add_argument('--best_criterion', type=str, default='val_loss', help='Criterion to consider when choosing the "best" model. Can also use \
+																					"val_acc", "train_loss", or "train_acc" (and perhaps others?).')
 args = parser.parse_args()
 
-hardware, batch_size, num_epochs = args.hardware, args.batch_size, args.num_epochs
+hardware, batch_size, num_epochs, best_criterion = args.hardware, args.batch_size, args.num_epochs, args.best_criterion
 
 ### Pick CPU or GPU ###
 if hardware == "cpu":
@@ -95,8 +100,9 @@ for d in device_names:
 		x_train /= 255
 		x_test /= 255
 
+# check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
+model_checkpoint = ModelCheckpoint(train_path + 'best_weights_' + best_criterion + '.hdf5', monitor=best_criterion, save_best_only=True)
 
-for epoch in range(num_epochs):
-	model.fit(x_train, y_train, batch_size=batch_size, epochs=1, 
-						validation_data=(x_test, y_test), shuffle=True)
-	model.save(train_path + 'epoch' + str(epoch) + '.hdf5')
+# fit the model using the defined 'model_checkpoint' callback
+model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_test, y_test), shuffle=True, callbacks=[model_checkpoint])
+
