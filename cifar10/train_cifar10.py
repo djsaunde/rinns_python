@@ -3,36 +3,42 @@
 # https://github.com/fchollet/keras/blob/master/examples/cifar10_cnn.py
 
 import keras
+import sys, os
+import argparse
+import tensorflow as tf
+
 from keras import losses
 from keras.datasets import cifar10
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
-import sys
-import tensorflow as tf
+
+train_path = '../work/training/cifar10/'
+if not os.path.isdir('../work/training/cifar10/'):
+	os.makedirs('../work/training/cifar10/')
+
+parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
+parser.add_argument('--hardware', type=str, default='cpu', help='cpu, gpu, or 2gpu currently supported.')
+parser.add_argument('--batch_size', type=int, default=100)
+parser.add_argument('--num_epochs', type=int, default=25)
+args = parser.parse_args()
+
+hardware, batch_size, num_epochs = args.hardware, args.batch_size, args.num_epochs
 
 ### Pick CPU or GPU ###
-if len(sys.argv) == 2:
-	device_names = sys.argv[1]
-else:
-	device_names = "cpu"
-
-if device_names == "gpu":
+if hardware == "cpu":
+	device_names = ["/cpu:0"]
+elif hardware == "gpu":
     device_names = ["/gpu:0"]
-elif device_names == "2gpu":
+elif hardware == "2gpu":
 	device_names = ["/gpu:0", "/gpu:1"]
 else:
-    device_names = ["/cpu:0"]
-###
+    raise NotImplementedError
 
 ### Run code on chosen devices ###
 for d in device_names:
 	with tf.device(d):
-		batch = 100
-		num_classes = 10
-		num_epochs = 45
-		data_augmentation = False
 
 		(x_train, y_train), (x_test, y_test) = cifar10.load_data()
 		# Checking data sizes
@@ -41,8 +47,8 @@ for d in device_names:
 		print(x_test.shape[0], 'test samples')
 
 		# Convert class vectors to binary class matrices
-		y_train = keras.utils.to_categorical(y_train, num_classes)
-		y_test = keras.utils.to_categorical(y_test, num_classes)
+		y_train = keras.utils.to_categorical(y_train, 10)
+		y_test = keras.utils.to_categorical(y_test, 10)
 
 		# Feed-forward
 		model = Sequential()
@@ -89,8 +95,8 @@ for d in device_names:
 		x_train /= 255
 		x_test /= 255
 
-###
-if not data_augmentation:
-	print('Not using data augmentation.')
-	model.fit(x_train, y_train, batch_size=batch, epochs=num_epochs, 
+
+for epoch in range(num_epochs):
+	model.fit(x_train, y_train, batch_size=batch_size, epochs=1, 
 						validation_data=(x_test, y_test), shuffle=True)
+	model.save(train_path + 'epoch' + str(epoch) + '.hdf5')
