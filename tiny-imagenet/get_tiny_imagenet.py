@@ -2,7 +2,7 @@ import os
 import numpy as np
 from scipy.misc import imread
 
-def load_tiny_imagenet(path, dtype=np.float32):
+def get_data(path, dtype=np.float32):
   """
   Load TinyImageNet. Each of TinyImageNet-100-A, TinyImageNet-100-B, and
   TinyImageNet-200 have the same directory structure, so this can be used
@@ -106,4 +106,5 @@ def load_tiny_imagenet(path, dtype=np.float32):
     y_test = [wnid_to_label[img_file_to_wnid[img_file]] for img_file in img_files]
     y_test = np.array(y_test)
   
-  return class_names, X_train, y_train, X_val, y_val, X_test, y_test
+  #return class_names, X_train, y_train, X_val, y_val, X_test, y_test
+  return class_names, X_train, y_train, X_val, y_val
