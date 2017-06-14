@@ -16,7 +16,10 @@ from keras.callbacks import ModelCheckpoint
 
 # Suppress compiler warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
-
+# Path to put computed activations/best epoch
+train_path = os.path.join('..', 'work', 'training', 'tiny_imagenet')
+if not os.path.isdir(train_path):
+	os.makedirs(train_path)
 
 def train_tiny_imagenet(hardware='cpu', batch_size=100, num_epochs=25, num_classes=200):
 	# Load data
@@ -154,12 +157,14 @@ def load_tiny_imagenet(num_classes=200):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Train a convolutional neural network on the Tiny-Imagenet dataset.')
 	parser.add_argument('--hardware', type=str, default='cpu', help='cpu, gpu, or 2gpu currently supported.')
-	parser.add_argument('--batch_size', type=int, default=100)
-	parser.add_argument('--num_epochs', type=int, default=25)
-	parser.add_argument('--num_classes', type=int, default=200)
-	parser.add_argument('--data_augmentation', type=bool, default=False)
+	parser.add_argument('--batch_size', type=int, default=100, help='')
+	parser.add_argument('--num_epochs', type=int, default=100, help='')
+	parser.add_argument('--num_classes', type=int, default=200, help='')
+	parser.add_argument('--data_augmentation', type=bool, default=False, help='')
+	parser.add_argument('--best_criterion', type=str, default='val_loss', help='Criterion to consider when choosing the "best" model. Can also use \
+																				"val_acc", "train_loss", or "train_acc" (and perhaps others?).')
 	args = parser.parse_args()
-	hardware, batch_size, num_epochs, num_classes, data_augmentation = args.hardware, args.batch_size, args.num_epochs, args.num_classes, args.data_augmentation
+	hardware, batch_size, num_epochs, num_classes, data_augmentation, best_criterion = args.hardware, args.batch_size, args.num_epochs, args.num_classes, args.data_augmentation, args.best_criterion
 
 	# Possibly change num_classes to be a list of specific classes?
 	train_tiny_imagenet(hardware, batch_size, num_epochs, num_classes)
