@@ -19,15 +19,15 @@ Run 'train_cifar10_lenet.py'
 	* `python train_cifar10_lenet.py`
 
 Optional flags are included in the code for your preferences and hardware capability	
-* --hardware=<string-choice>
+* --hardware=(string)
 	* 'cpu' (Default)
 	* 'gpu'
 	* '2gpu'
-* --batch_size=<int>
+* --batch_size=(int)
 	* 100 (Default)
-* --num_epochs=<int>
+* --num_epochs=(int)
 	* 25 (Default)
-* --best_criterion=<string-choice>
+* --best_criterion=(string)
 	* 'val_loss' (Default)
 	* 'val_acc'
 	* 'train_loss'
@@ -45,9 +45,9 @@ Optional flags
 * --batch_size
 * --num_epochs
 * --best_criterion
-* --num_classes=<int>
+* --num_classes=(int)
 	* 200 (Default)
 	* 1-200
-* --data_augmentation=<bool>
+* --data_augmentation=(bool)
 	* False (Default)
 	* True
