@@ -17,7 +17,7 @@ from keras.callbacks import ModelCheckpoint
 
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'cifar10_lenet'
+train_path = os.path.join('..', 'work', 'training', 'cifar10_lenet')
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
 
