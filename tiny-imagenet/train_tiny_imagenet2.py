@@ -21,12 +21,12 @@ train_path = os.path.join('..', 'work', 'training', 'tiny_imagenet')
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
 
-def train_tiny_imagenet(hardware='cpu', batch_size=100, num_epochs=25, num_classes=200):
+def train_tiny_imagenet(hardware='cpu', batch_size=100, num_epochs=50, num_classes=200):
 	# Load data
 	x_train, y_train, x_val, y_val = load_tiny_imagenet(num_classes)
 	
 	if hardware == 'gpu':
-		devices = ['/gpu:0']
+		devices = ['/gpu:1']
 	elif hardware == '2gpu':
 		devices = ['/gpu:0', '/gpu:1']
 	else:
@@ -74,7 +74,7 @@ def train_tiny_imagenet(hardware='cpu', batch_size=100, num_epochs=25, num_class
 
 			"""Block 5"""
 			model.add(Flatten())
-			model.add(Dense(4096))
+			model.add(Dense(2048))
 			model.add(BatchNormalization())
 			model.add(Activation('relu'))
 			

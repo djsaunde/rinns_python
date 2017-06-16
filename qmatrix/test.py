@@ -5,17 +5,23 @@ __author__ = 'Dan Saunders'
 import tensorflow as tf
 import numpy as np
 import argparse
-import numba
 import keras
 import sys
 import os
 
-from scipy.signal import correlate2d
+from numba import cuda
+from numba import jit
+
+import cudamat as cm
+
+# Initialize gpu setup
+cm.cublas_init()
 
 # ignore Tensorflow CPU compilation warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 
+@jit
 def corr(x, y):
     """Correlate each n with each m.
 
@@ -33,6 +39,8 @@ def corr(x, y):
       N X M array in which each element is a correlation coefficient.
 
     """
+
+
     mu_x = x.mean(1)
     mu_y = y.mean(1)
     n = x.shape[1]
@@ -41,10 +49,21 @@ def corr(x, y):
                          'have the same number of timepoints.')
     s_x = x.std(1, ddof=n - 1)
     s_y = y.std(1, ddof=n - 1)
-    cov = np.dot(x,
-                 y.T) - n * np.dot(mu_x[:, np.newaxis],
-                                  mu_y[np.newaxis, :])
-    return cov / np.dot(s_x[:, np.newaxis], s_y[np.newaxis, :])
+    ryan_x = s_x[:, np.newaxis]
+    ryan_y = s_y[np.newaxis, :]
+    
+    n = cm.CUDAMatrix(n)
+    x = cm.CUDAMatrix(x)
+    y = cm.CUDAMatrix(y)
+    mu_x = cm.CUDAMatrix(mu_x[:, np.newaxis])
+    mu_y = cm.CUDAMatrix(my_y[np.newaxis, :])
+    ryan_x = cm.CUDAMatrix(ryan_x)
+    ryan_y = cm.CUDAMatrix(ryan_y)
+	
+    #cov = np.dot(x, y.T) - n * np.dot(mu_x[:, np.newaxis], mu_y[np.newaxis, :])
+    cov = cm.dot(x, y.T) - n * cm.dot(mu_x, mu_y)
+	#return cov / np.dot(s_x[:, np.newaxis], s_y[np.newaxis, :])
+    return np.asarray(cov / cm.dot(ryan_x, ryan_y))
 
 
 # parse optional arguments from user
@@ -64,15 +83,18 @@ if not os.path.isdir(qmatrix_path):
 
 # load the network model from disk
 model_path = os.path.join('..', 'work', 'training', model_name, 'best_weights_' + best_criterion + '.hdf5')
-model = keras.models.load_model(model_path)
-print(model.summary())
+#model = keras.models.load_model(model_path)
+#print(model.summary())
 
 # get network metadata
-num_layers = len(model.layers)
-num_classes = model.layers[-1].output_shape[1]
+#num_layers = len(model.layers)
+num_layers = 14
+#num_classes = model.layers[-1].output_shape[1]
+num_classes = 10
 
 # get validation data labels
-activation_path = os.path.join('..', 'work', 'activations', model_name)
+#activation_path = os.path.join('..', 'work', 'activations', model_name)
+activation_path = os.path.join('..', 'work', 'activations', 'cifar10_lenet')
 labels = np.load(os.path.join(activation_path, 'labels.npy'))
 
 # compute Q-matrices starting from output layer
@@ -176,6 +198,7 @@ for layer_idx in range(num_layers, 0, -1):
 			continue
 
 		# correlate the neurons based on images in this class
+		#corr_data = corr(data_a[:, labels == label_idx], data_b[:, labels == label_idx])
 		corr_data = corr(data_a[:, labels == label_idx], data_b[:, labels == label_idx])
 
 		# select the correlations of the neurons that these columns came from
@@ -209,6 +232,7 @@ for layer_idx in range(num_layers, 0, -1):
 		del data_a
 	
 	# Step 3: normalize and multiply by weights
+	"""
 	layer = model.layers[layer_idx-1]
 	has_weights = 'dense' in layer.name or 'conv' in layer.name
 	
@@ -223,10 +247,11 @@ for layer_idx in range(num_layers, 0, -1):
 
 		im_size = np.prod(layer.input_shape[1:])
 	else:
-		if not os.path.isdir('q_out'):
-			os.makedirs('q_out')
-		
-		qfile = np.load(qfname_temp)
-		np.save(os.path.join('q_out', qfname), qfile)
+	"""
+	if not os.path.isdir('q_out'):
+		os.makedirs('q_out')
+
+	qfile = np.load(qfname_temp)
+	np.save(os.path.join('q_out', qfname), qfile)
 
 
