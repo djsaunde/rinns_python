@@ -24,6 +24,8 @@ args = parser.parse_args()
 model_name, dataset, best_criterion = args.model_name, args.dataset, args.best_criterion
 
 activations_path = os.path.join('..', 'work', 'activations', model_name)
+if not os.path.isdir(activations_path):
+	os.makedirs(activations_path)
 
 # load data (validation data only for this step!)
 print('...Loading validation data.')
