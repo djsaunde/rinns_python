@@ -23,10 +23,14 @@ args = parser.parse_args()
 
 model_name, dataset, best_criterion = args.model_name, args.dataset, args.best_criterion
 
+activations_path = os.path.join('..', 'work', 'activations', model_name)
+
 # load data (validation data only for this step!)
 print('...Loading validation data.')
 if dataset == 'cifar10':
 	(x_train, y_train), (x_valid, y_valid) = cifar10.load_data()
+	# save validation labels to disk
+	np.save(os.path.join(activations_path, 'labels.npy'), y_valid.reshape(10000))
 	y_valid = to_categorical(y_valid, 10)
 else:
 	raise NotImplementedError
@@ -46,9 +50,9 @@ activations = functor([x_valid, 1.])
 
 # save activations to disk, making directories as needed
 print('...Writing computed activations to file.')
-activations_path = os.path.join('..', 'work', 'activations', model_name)
 if not os.path.isdir(activations_path):
 	os.makedirs(activations_path)
 
 for idx, layer_activation in enumerate(activations):
 	np.save(os.path.join(activations_path, 'layer' + str(idx + 1) + '.npy'), layer_activation)
+

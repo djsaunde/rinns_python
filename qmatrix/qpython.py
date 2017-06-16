@@ -1,10 +1,7 @@
-# Mimics the functionality of "build_all_q.m" from Thomas Watson's Representations in Neural Networks project code.
-
-__author__ = 'Dan Saunders'
-
 import numpy as np
 import argparse
 import keras
+import ipdb
 import sys
 import os
 
@@ -60,6 +57,8 @@ qmatrix_path = os.path.join('..', 'work', 'qmatrix', model_name)
 if not os.path.isdir(qmatrix_path):
     os.makedirs(qmatrix_path)
 
+
+
 # load the network model from disk
 model_path = os.path.join('..', 'work', 'training', model_name, 'best_weights_' + best_criterion + '.hdf5')
 model = keras.models.load_model(model_path)
@@ -85,11 +84,11 @@ for layer_idx in range(num_layers, 0, -1):
 		old_class_map = np.array(range(num_classes))
 		threshold = 0
 	else:
-		# qfname = 'q' + str(layer_idx+1) + '_temp.npy'
-		old_q = np.load(os.path.join('q_out', qfname))
-		old_col_weight = np.copy(col_weight)
-		old_q_size = np.copy(q_size)
-		old_class_map = np.copy(class_map)
+		qfname = 'q' + str(layer_idx+1) + '_temp.npy'
+		old_q = np.load(qfname)
+		old_col_weight = col_weight
+		old_q_size = q_size
+		old_class_map = class_map
 	
 	# the maximum number of columns the new Q-matrix can have is the number of
 	# neurons in the previous Q-matrix times the number of classes
@@ -103,13 +102,25 @@ for layer_idx in range(num_layers, 0, -1):
 	other_idx = 0
 	for neuron_idx in range(old_q_size[0]):
 		# select each row with this previous neuron in the previous Q-matrix
+		#print(old_q)
+		
+		########################
+		ipdb.set_trace()
+###############################
 		row_select = old_q[neuron_idx, :] > threshold
+		#print(old_q[neuron_idx, :])
+		#print("threshold: ", threshold)
 		row_num = np.sum(row_select)
 
 		# if there aren't any, simply move on
 		if row_num == 0:
 			continue
-		
+
+		#print(old_q)
+		#print(old_q.shape)
+		print(row_select)
+		print(old_class_map)
+
 		# map these neurons to classes
 		class_select = old_class_map[row_select]
 		weight_select = old_col_weight[row_select]
@@ -118,7 +129,7 @@ for layer_idx in range(num_layers, 0, -1):
 		# instead, we note how many would be there so we can weight appropriately during classifcation.
 		classes = np.unique(class_select)
 		row_num = len(classes)
-		r = np.array([ np.sum(weight_select[class_select == cls]) for cls in classes ])
+		r = np.sum(weight_select[class_select == classes], axis=0) # this probably won't work
 
 		# select the correlations for this neuron and each class that it's associated with
 		neuron_map[other_idx:other_idx + row_num] = neuron_idx
@@ -128,29 +139,24 @@ for layer_idx in range(num_layers, 0, -1):
 		other_idx += row_num
 	
 	# remove unused columns
-	neuron_map = np.delete(neuron_map, np.s_[other_idx:max_cols])
-	class_map = np.delete(class_map, np.s_[other_idx:max_cols])
-	col_weight = np.delete(col_weight, np.s_[other_idx:max_cols])
+	neuron_map = np.delete(neuron_map, np.s_[other_idx:max_cols], axis=0)
+	class_map = np.delete(class_map, np.s_[other_idx:max_cols], axis=0)
+	col_weight = np.delete(col_weight, np.s_[other_idx:max_cols], axis=0)
 
 	del old_q, old_class_map, old_col_weight
 
 	# Step 2: Build new Q-matrix
 	qfname_temp = 'q' + str(layer_idx) + '_temp.npy'
-	qfname = 'q' + str(layer_idx) + '.npy'
+	qfname = 'q' + str(layer_idx) + '.bin'
 
 	# load activation data for the two layers we're correlating
 	if 'data_a_map' in locals():
 		data_b = data_a # we have already loaded it from the last iteration
 	else:
 		data_b = np.load(os.path.join(activation_path, 'layer' + str(layer_idx) + '.npy')).T
-		data_b = data_b.reshape((np.prod(data_b.shape[:-1]), data_b.shape[-1]))
 	
 	data_a = np.load(os.path.join(activation_path, 'layer' + str(layer_idx - 1) + '.npy')).T
-	data_a = data_a.reshape((np.prod(data_a.shape[:-1]), data_a.shape[-1]))
-
-	q_size = [np.prod(data_a.shape[:-1]), len(neuron_map)]
-
-	print(data_a.shape, data_b.shape)
+	q_size = [data_a.shape[0], len(neuron_map)]
 
 	print('Building Q' + str(layer_idx) + ' (' + str(q_size[0]) + 'x' + str(q_size[1]) + ')')
 
@@ -158,9 +164,9 @@ for layer_idx in range(num_layers, 0, -1):
 	q_max = -np.inf
 	q_min = np.inf
 
-	old_class_map = np.copy(class_map)
-	old_col_weight = np.copy(col_weight)
-	old_neuron_map = np.copy(neuron_map)
+	old_class_map = class_map
+	old_col_weight = col_weight
+	old_neuron_map = neuron_map
 
 	# go through each class (correlation matrix depends on class)
 	other_idx = 0
@@ -175,30 +181,35 @@ for layer_idx in range(num_layers, 0, -1):
 
 		# correlate the neurons based on images in this class
 		corr_data = corr(data_a[:, labels == label_idx], data_b[:, labels == label_idx])
+		# corr_data = corr_data.reshape(data_a[:, labels == label_idx].T.shape)
+		
+		print(corr_data.shape)
 
 		# select the correlations of the neurons that these columns came from
 		corr_data = corr_data[:, np.asarray(old_neuron_map[select], dtype=np.int)]
+		
+		ipdb.set_trace()
+		
+		print(corr_data.shape)
 
 		# update minimum, maximum
 		q_max = np.maximum(q_max, np.max(corr_data))
 		q_min = np.minimum(q_min, np.min(corr_data))
+
+		# corr_data = np.divide(corr_data, np.maximum(np.abs(q_max), np.abs(q_min)))
 
 		# this reorders the maps, so we have to update them
 		class_map[other_idx:other_idx + row_num] = old_class_map[select]
 		col_weight[other_idx:other_idx + row_num] = old_col_weight[select]
 		neuron_map[other_idx:other_idx + row_num] = old_neuron_map[select]
 
-		if not 'to_write' in locals():
-			to_write = corr_data
-		else:
-			to_write = np.hstack((to_write, corr_data))
+		print(old_class_map)
 
+		# write correlation data to Q-matrix file
+		np.save(qfname_temp, corr_data)
+		del corr_data
 		other_idx += row_num
 	
-	# write correlation data to Q-matrix file
-	np.save(qfname_temp, to_write)
-	
-	del corr_data, to_write
 	del data_b, old_class_map, old_col_weight
 
 	if layer_idx == 1:
@@ -208,21 +219,3 @@ for layer_idx in range(num_layers, 0, -1):
 	layer = model.layers[layer_idx-1]
 	has_weights = 'dense' in layer.name or 'conv' in layer.name
 	
-	if has_weights and use_weights:
-		# we only have to normalize and multiply by weights if the layer has them
-		# we compute the "unshared" weights by convolving the identity matrix of size
-		# equal to the number of neurons. This means each output image is the weights
-		# that make up one input neuron. The problem is that they need to be applied
-		# to the transposes Q-matrix, so we write them to disk.
-		w_size = layer.get_weights().shape
-		weights = layer.get_weights()
-
-		im_size = np.prod(layer.input_shape[1:])
-	else:
-		if not os.path.isdir('q_out'):
-			os.makedirs('q_out')
-		
-		qfile = np.load(qfname_temp)
-		np.save(os.path.join('q_out', qfname), qfile)
-
-

@@ -25,8 +25,8 @@ parser = argparse.ArgumentParser(description='Train a convolutional neural netwo
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
 parser.add_argument('--batch_size', type=int, default=100, help='Number of training / validation examples per minibatch.')
 parser.add_argument('--num_epochs', type=int, default=25, help='Number of epochs (passes through training dataset) for which to train the network.')
-parser.add_argument('--best_criterion', type=str, default='val_loss', help='Criterion to consider when choosing the "best" model. Can also use \
-																					"val_acc", "train_loss", or "train_acc" (and perhaps others?).')
+parser.add_argument('--best_criterion', type=str, default='val_loss', help='Criterion to consider when choosing the "best" model. Can also \
+																use "val_acc", "train_loss", or "train_acc" (and perhaps others?).')
 args = parser.parse_args()
 
 hardware, batch_size, num_epochs, best_criterion = args.hardware, args.batch_size, args.num_epochs, args.best_criterion
