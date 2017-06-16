@@ -16,7 +16,7 @@ Consult `requirements.txt` for the packages which the project code depends on. I
 Navigate to the 'cifar10' folder
 
 Run 'train_cifar10_lenet.py'
-	* `python train_cifar10_lenet.py`
+* `python train_cifar10_lenet.py`
 
 Optional flags are included in the code for your preferences and hardware capability	
 * --hardware=(string)
@@ -38,7 +38,7 @@ Optional flags are included in the code for your preferences and hardware capabi
 Navigate to the 'tiny-imagenet' folder
 
 Run 'train_tiny_imagenet.py'
-	* `python train_tiny_imagenet.py`
+* `python train_tiny_imagenet.py`
 
 Optional flags
 * --hardware
