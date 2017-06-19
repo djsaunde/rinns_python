@@ -45,8 +45,8 @@ else:
 for d in device_names:
 	with tf.device(d):
 
-		(x_train, y_
-		 not ask for confirmation.
+		(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
 		# Checking data sizes
 		print('x_train shape:', x_train.shape)
 		print(x_train.shape[0], 'train samples')
