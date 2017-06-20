@@ -1,3 +1,4 @@
 *.npy
 *.hdf5
 tiny-imagenet/tiny-imagenet-200
+.*.swp
