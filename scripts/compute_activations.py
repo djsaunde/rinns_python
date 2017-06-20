@@ -34,6 +34,11 @@ if dataset == 'cifar10':
 	# save validation labels to disk
 	np.save(os.path.join(activations_path, 'labels.npy'), y_valid.reshape(10000))
 	y_valid = to_categorical(y_valid, 10)
+elif dataset == 'mnist':
+	(x_train, y_train), (x_valid, y_valid) = mnist.load_data()
+	# save validation labels to disk
+	np.save(os.path.join(activations_path, 'labels.npy'), y_valid.reshape(10000))
+	y_valid = to_categorical(y_valid, 10)
 else:
 	raise NotImplementedError
 
