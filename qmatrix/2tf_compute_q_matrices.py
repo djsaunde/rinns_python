@@ -277,11 +277,11 @@ for layer_idx in range(num_layers, 1, -1):
 		# equal to the number of neurons. This means each output image is the weights
 		# that make up one input neuron. The problem is that they need to be applied
 		# to the transposes Q-matrix, so we write them to disk.
-		w_size = layer.get_weights()[0].shape
+		w_size = layer.input_shape
 
 		weights = layer.get_weights()[0]
 
-		im_size = np.prod(layer.input_shape[1:])
+		im_size = np.prod(w_size[1:])
 		imstep = max(1, math.floor(((2**30)/4) / im_size))
 
 		for im in range(0, im_size, imstep):
@@ -290,19 +290,15 @@ for layer_idx in range(num_layers, 1, -1):
 			
 			im_data = np.zeros((im_size, this_step))
 			
-			print(im_size)
-			print(layer.input_shape)
-			print(w_size)
-
 			for idx in range(im, this_end):
 				im_data[idx, idx - im] = 1;
 
 			if 'conv' in layer.name:
-				im_data = im_data.reshape([w_size[0], w_size[1], w_size[2], this_step])
+				im_data = im_data.reshape([w_size[1], w_size[2], w_size[3], this_step])
 			
 				print(im_data.shape, weights.shape)
 			
-				im_data, weights = np.einsum('ijkl->iklj', im_data), np.einsum('ijkl->iklj', weights)
+				im_data, weights = np.einsum('ijkl->lijk', im_data), weights # np.einsum('ijkl->iklj', weights)
 			
 			im_data = im_data.astype(np.float32)
 
@@ -324,22 +320,36 @@ for layer_idx in range(num_layers, 1, -1):
 				result = output.eval(session=sess).reshape((weights.shape[2], weights.shape[1]))
 
 			if 'conv' in layer.name:
+				output = tf.nn.conv2d(im_data, weights, strides=[1,1,1,1], padding='SAME')
+				
+				'''
 				output = tf.map_fn(
 					lambda inputs : tf.nn.conv2d(
-						tf.expand_dims(inputs[0], 0),
-						tf.expand_dims(inputs[1], 3),
+						inputs[0], # tf.expand_dims(inputs[0], 0),
+						inputs[1], # tf.expand_dims(inputs[1], 3),
 						strides=[1,1,1,1],
-						padding='SAME'
+						padding='VALID'
 					),
 					elems=[im_data, weights],
 					dtype=tf.float32
 				)
+				'''
+
+				print(output.shape)
+				result = output.eval(session=sess).reshape((np.prod(output.shape[1:]), output.shape[0]))
+				print(result.shape)
 
 			# output = output.reshape((output.shape[1], output.shape[2], output.shape[3], output.shape[0]))
 
 			# result = output.eval(session=sess)
 
-			np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), result)
+			if 'to_write' not in locals():
+				to_write = result
+			else:
+				to_write = np.hstack((to_write, result))
+
+		np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), to_write)
+		del to_write
 
 		old_col_weight = col_weight
 		old_class_map = class_map
@@ -366,7 +376,7 @@ for layer_idx in range(num_layers, 1, -1):
 			result = result / (old_q_max - old_q_min)
 
 			# multiply by appropriate weights
-			result = result * np.expand_dims(weights[neuron_idx, :], axis=1)
+			result = result * np.expand_dims(weights[neuron_idx, :], axis=-1)
 
 			# recompute max and min
 			q_max = max([q_max, np.max(result)])
