@@ -131,8 +131,8 @@ labels = np.load(os.path.join(activation_path, 'labels.npy'))
 for layer_idx in range(num_layers, 1, -1):
 	print('Computing Q-matrix for layer ' + str(layer_idx))
 
-	if 'to_write' in locals():
-		del to_write
+	if 'q' in locals():
+		del q
 
 	# Step 1: Load old Q-matrix
 	if layer_idx == num_layers:
@@ -142,7 +142,8 @@ for layer_idx in range(num_layers, 1, -1):
 		old_class_map = np.array(range(num_classes))
 		threshold = 0
 	else:
-		# qfname = 'q' + str(layer_idx+1) + '_temp.npy'
+		# Dan had qfname commented out
+		qfname = 'q' + str(layer_idx+1) + '_temp.npy'
 		old_q = np.load(os.path.join('q_out', qfname))
 		old_col_weight = np.copy(col_weight)
 		old_q_size = np.copy(q_size)
@@ -155,6 +156,11 @@ for layer_idx in range(num_layers, 1, -1):
 	neuron_map = np.zeros(max_cols)
 	class_map = np.zeros(max_cols)
 	col_weight = np.zeros(max_cols)
+
+	#print(old_q)
+	#for i in range(len(old_q)):
+		#print(i, " \n")
+		#print(old_q[i])
 
 	# iterate through each neuron in the previous layer
 	other_idx = 0
@@ -197,7 +203,7 @@ for layer_idx in range(num_layers, 1, -1):
 
 	# load activation data for the two layers we're correlating
 	if 'data_a_map' in locals():
-		data_b = data_a # we have already loaded it from the last iteration
+		data_b = np.copy(data_a) # we have already loaded it from the last iteration
 	else:
 		data_b = np.load(os.path.join(activation_path, 'layer' + str(layer_idx) + '.npy')).T
 		data_b = data_b.reshape((np.prod(data_b.shape[:-1]), data_b.shape[-1]))
@@ -232,7 +238,7 @@ for layer_idx in range(num_layers, 1, -1):
 
 		# correlate the neurons based on images in this class
 		corr_data = corr(data_a[:, labels == label_idx], data_b[:, labels == label_idx])
-
+		
 		# select the correlations of the neurons that these columns came from
 		corr_data = corr_data[:, np.asarray(old_neuron_map[select], dtype=np.int)]
 
@@ -245,17 +251,17 @@ for layer_idx in range(num_layers, 1, -1):
 		col_weight[other_idx:other_idx + row_num] = old_col_weight[select]
 		neuron_map[other_idx:other_idx + row_num] = old_neuron_map[select]
 
-		if not 'to_write' in locals():
-			to_write = corr_data
+		if not 'q' in locals():
+			q = corr_data
 		else:
-			to_write = np.hstack((to_write, corr_data))
+			q = np.hstack((q, corr_data))
 
 		other_idx += row_num
-	
+
 	# write correlation data to Q-matrix file
-	np.save(os.path.join('q_out', qfname_temp), to_write)
-	
-	del corr_data
+	np.save(os.path.join('q_out', qfname_temp), q)
+
+	del corr_data, q
 	del data_b, old_class_map, old_col_weight
 
 	if layer_idx == 1:
@@ -282,40 +288,56 @@ for layer_idx in range(num_layers, 1, -1):
 			this_end = min(im + imstep - 1, im_size)
 			this_step = this_end - im
 			
-			if len(w_size) == 2:
-				weights = weights.reshape((1, 1, weights.shape[0], weights.shape[1]))
-				w_size = weights.shape
-
 			im_data = np.zeros((im_size, this_step))
 			
+			print(im_size)
+			print(layer.input_shape)
+			print(w_size)
+
 			for idx in range(im, this_end):
 				im_data[idx, idx - im] = 1;
 
-			im_data = im_data.reshape([w_size[0], w_size[1], w_size[2], this_step]).astype(np.float32)
+			if 'conv' in layer.name:
+				im_data = im_data.reshape([w_size[0], w_size[1], w_size[2], this_step])
 			
+				print(im_data.shape, weights.shape)
+			
+				im_data, weights = np.einsum('ijkl->iklj', im_data), np.einsum('ijkl->iklj', weights)
+			
+			im_data = im_data.astype(np.float32)
+
 			print(im_data.shape, weights.shape)
-			#print('imdata: ', im_data)
 			
-			im_data, weights = np.einsum('ijkl->lijk', im_data), weights # np.einsum('ijkl->klij', weights)
-			
-			print(im_data.shape, weights.shape)
+			if 'dense' in layer.name:
+				im_data = tf.expand_dims(im_data, 0)
+				weights = tf.expand_dims(weights, 0)
+				output = tf.map_fn(
+					lambda inputs : tf.nn.xw_plus_b(
+						inputs[0], # tf.expand_dims(tf.transpose(inputs[0]), 0), # inputs[0],
+						inputs[1], # tf.expand_dims(inputs[1], -1),
+						np.zeros(inputs[1].shape[1]).astype(np.float32)
+					),
+					elems=[im_data, weights],
+					dtype=tf.float32
+				)
+				
+				result = output.eval(session=sess).reshape((weights.shape[2], weights.shape[1]))
 
-			output = tf.map_fn(
-				lambda inputs : tf.nn.conv2d(
-					tf.expand_dims(inputs[0], 0),
-					tf.expand_dims(inputs[1], 3),
-					strides=[1,1,1,1],
-					padding='VALID'
-				),
-				elems=[im_data, weights],
-				dtype=tf.float32
-			)
+			if 'conv' in layer.name:
+				output = tf.map_fn(
+					lambda inputs : tf.nn.conv2d(
+						tf.expand_dims(inputs[0], 0),
+						tf.expand_dims(inputs[1], 3),
+						strides=[1,1,1,1],
+						padding='SAME'
+					),
+					elems=[im_data, weights],
+					dtype=tf.float32
+				)
 
-			print(output.shape)
+			# output = output.reshape((output.shape[1], output.shape[2], output.shape[3], output.shape[0]))
 
-			output = output.reshape((output.shape[1], output.shape[2], output.shape[3], output.shape[0]))
-
-			result = output[:, 0, :, :, 0].eval(session=sess)
+			# result = output.eval(session=sess)
 
 			np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), result)
 
@@ -328,6 +350,7 @@ for layer_idx in range(num_layers, 1, -1):
 		q_min = np.inf
 
 		weights = np.load(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'))
+		q = np.load(os.path.join('q_out', qfname_temp))
 
 		other_idx = 0
 		for neuron_idx in range(old_q_size[0]):
@@ -339,26 +362,34 @@ for layer_idx in range(num_layers, 1, -1):
 				continue
 
 			# get these columns and normalize
-			result = to_write[:, select] - old_q_min
+			result = q[:, select] - old_q_min
 			result = result / (old_q_max - old_q_min)
 
 			# multiply by appropriate weights
-			result = result * weights[neuron_idx, :].T
+			result = result * np.expand_dims(weights[neuron_idx, :], axis=1)
 
 			# recompute max and min
-			q_max = max([q_max, max(result)])
-			q_min = min([q_min, min(result)])
+			q_max = max([q_max, np.max(result)])
+			q_min = min([q_min, np.min(result)])
 
 			# write it to disk
 			col_weight[other_idx:other_idx + row_num] = old_col_weight[select]
 			class_map[other_idx:other_idx + row_num] = old_class_map[select]
 			
-			print(result.shape)
-
-			np.save(os.path.join('q_out', qfname), result)
+			# print(result)
+			
+			if 'q_new' not in locals():
+				q_new = result
+			else:
+				q_new = np.hstack((q_new, result))
+			
 			del result
-
 			other_idx = other_idx + row_num
+
+		np.save(os.path.join('q_out', qfname), q_new)
+		
+		del q_new
+		
 	else:
 		if not os.path.isdir('q_out'):
 			os.makedirs('q_out')
