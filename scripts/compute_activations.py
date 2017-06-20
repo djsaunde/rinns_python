@@ -9,6 +9,7 @@ import pickle as p
 
 from keras import backend
 from keras.datasets import cifar10
+from keras.datasets import mnist
 from keras.models import load_model
 from keras.utils import to_categorical
 
@@ -36,6 +37,8 @@ if dataset == 'cifar10':
 	y_valid = to_categorical(y_valid, 10)
 elif dataset == 'mnist':
 	(x_train, y_train), (x_valid, y_valid) = mnist.load_data()
+	x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')
+	x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')
 	# save validation labels to disk
 	np.save(os.path.join(activations_path, 'labels.npy'), y_valid.reshape(10000))
 	y_valid = to_categorical(y_valid, 10)

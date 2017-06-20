@@ -71,12 +71,12 @@ for d in device_names:
 		# Build model
 		model = Sequential()
 		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		model.add(Conv2D(64, (3, 3), activation='relu'))
-		model.add(MaxPooling2D((2, 2)))
-		model.add(Dropout(0.25))
+		#model.add(Conv2D(64, (3, 3), activation='relu'))
+		#model.add(MaxPooling2D((2, 2)))
+		#model.add(Dropout(0.25))
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
-		model.add(Dropout(0.5))
+		#model.add(Dropout(0.5))
 
 		# Output layer
 		model.add(Dense(num_classes, activation='softmax'))
