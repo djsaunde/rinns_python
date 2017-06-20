@@ -253,7 +253,7 @@ for layer_idx in range(num_layers, 1, -1):
 		other_idx += row_num
 	
 	# write correlation data to Q-matrix file
-	np.save(qfname_temp, to_write)
+	np.save(os.path.join('q_out', qfname_temp), to_write)
 	
 	del corr_data
 	del data_b, old_class_map, old_col_weight
@@ -273,42 +273,45 @@ for layer_idx in range(num_layers, 1, -1):
 		# to the transposes Q-matrix, so we write them to disk.
 		w_size = layer.get_weights()[0].shape
 
-		weights = layer.get_weights()
-		
-		im_size = np.prod(layer.input_shape[1:])
+		weights = layer.get_weights()[0]
+	
+		im_size = np.prod(layer.output_shape[1:])
 		imstep = max(1, math.floor(((2**30)/4) / im_size))
-
-		print(im_size, imstep)
 
 		for im in range(0, im_size, imstep):
 			this_end = min(im + imstep - 1, im_size)
-			print("this_end = ", this_end)
-			print("imstep = ", imstep)
-			print("im_size = ", im_size)
-			print("im = ", im)
 			this_step = this_end - im
-			print("this_step = ", this_step)
-			im_data = np.zeros((im_size, this_step))
-
-			for idx in range(im, this_end):
-				im_data[idx, idx - im] = 1;
 			
 			if len(w_size) == 2:
-				im_data = im_data.reshape([2, this_step])
-				result = im_data * weights[0]
-			else:
-				im_data = im_data.reshape([np.prod(w_size[0:3]), this_step])
-				output = tf.map_fn(
-					lambda inputs : tf.nn.conv2d(
-						tf.expand_dims(inputs[0], 0),  # H,W,C -> 1,H,W,C
-						tf.expand_dims(inputs[1], 3),  # H,W,C -> H,W,C,1
-						strides=[1,1,1,1],
-						padding="SAME"
-					),  # Result of conv is 1,H,W,1
-					elems=[im_data, weights],
-					dtype=tf.float32
-				)
-				result = output[:, 0, :, :, 0]
+				weights = weights.reshape((1, 1, weights.shape[0], weights.shape[1]))
+				w_size = weights.shape
+
+			im_data = np.zeros((im_size, this_step))
+			
+			for idx in range(im, this_end):
+				im_data[idx, idx - im] = 1;
+
+			im_data = im_data.reshape([w_size[0], w_size[1], w_size[3], this_step]).astype(np.float32)
+		
+			print(im_data.shape, weights.shape)
+
+			A = [ im_data[:, :, :, idx] for idx in range(im_data.shape[3]) ]
+			B = [ weights[:, :, :, idx] for idx in range(weights.shape[3]) ]
+
+			output = tf.map_fn(
+				lambda inputs : tf.nn.conv2d(
+					tf.expand_dims(inputs[0], 0),  # H,W,C -> 1,H,W,C
+					tf.expand_dims(inputs[1], 3),  # H,W,C -> H,W,C,1
+					strides=[1,1,1,1],
+					padding='SAME'
+				),  # Result of conv is 1,H,W,1
+				elems=[A, B],
+				dtype=tf.float32
+			)
+
+			print(output)
+
+			result = output[:, 0, :, :, 0]
 
 			np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), result)
 
@@ -339,11 +342,13 @@ for layer_idx in range(num_layers, 1, -1):
 			print(result.shape)
 			print(weights.shape)
 
+			print(weights)
+
 			result = result * weights[neuron_idx, :].T
 
 			# recompute max and min
-			q_max = max(q_max, max(result))
-			q_min = min(q_min, min(result))
+			q_max = max([q_max, max(result)])
+			q_min = min([q_min, min(result)])
 
 			# write it to disk
 			col_weight[other_idx:other_idx + row_num] = old_col_weight[select]
@@ -359,7 +364,7 @@ for layer_idx in range(num_layers, 1, -1):
 		if not os.path.isdir('q_out'):
 			os.makedirs('q_out')
 		
-		qfile = np.load(qfname_temp)
+		qfile = np.load(os.path.join('q_out', qfname_temp))
 		np.save(os.path.join('q_out', qfname), qfile)
 
 
