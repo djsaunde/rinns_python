@@ -125,15 +125,62 @@ elif use_weights.lower() == 'false':
 else:
 	raise Exception('Enter True or False (case insensitive)!')
 
-out_path = os.path.join('..', 'work', 'qmatrix', model_name)
-if not os.path.isdir(out_path):
-    os.makedirs(out_path)
+qmatrix_path = os.path.join('..', 'work', 'qmatrix', model_name)
+if not os.path.isdir(qmatrix_path):
+    os.makedirs(qmatrix_path)
 
-rank = 0
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+comm_size = comm.Get_size()
+
+# load the network model from disk
+model_path = os.path.join('..', 'work', 'training', model_name, 'best_weights_' + best_criterion + '.hdf5')
+model = keras.models.load_model(model_path)
+
+############################################
 if rank == 0:
-	# load the network model from disk
-	model_path = os.path.join('..', 'work', 'training', model_name, 'best_weights_' + best_criterion + '.hdf5')
-	model = keras.models.load_model(model_path)
+	startqi = len(model.layers)
+	machine_names = np.array(range(comm_size))
+	for idx in range(1, comm_size):
+		mrank = []
+		while len(mrank) == 0:
+			# Not sure what source and tag are
+			# status = MPI.status() - optional 3rd argument - default=None
+			mrank = comm.Probe(MPI.ANY_SOURCE, 5)
+		for arank in mrank:
+			# Matlab MPI_Recv(source, tag, comm)
+			# comm.recv(source=0, tag=0, status=None)
+			machine_names[arank] = comm.recv(arank, 5)
+	# Broadcast completed list
+	# comm.bcast(obj=None, int root=0)
+	# no clue if this is correct
+	comm.bcast(machine_names, root=0)
+else:
+	# Send our name (Machine name is passed)
+	# also probably wrong
+	comm.send(machine_name)
+	# Get everyone else's names
+	machine_names = comm.recv(0, 6)
+#############################################
+
+memory = {}
+# This doesn't give the correct amount of available gpu memory, probably has to do with 'context
+#memory['total'] = pycuda.driver.mem_get_info()[0]
+#print(pycuda.driver.mem_get_info())
+nvmlInit()
+handle = nvmlDeviceGetHandleByIndex(0)
+memory['total'] = nvmlDeviceGetMemoryInfo(handle).free
+print(memory['total'])
+nvmlShutdown()
+
+if memory['total'] < 2 ** 30:
+	raise Exception('Less than 1Gb GPU memory available.')
+
+memory['reserved'] = memory['total'] * 0.85
+memory['q'] = memory['reserved'] * 0.5
+memory['activations'] = memory['reserved'] * 0.5
+
+if rank == 0:
 	print(model.summary())
 
 	# get network metadata
@@ -161,7 +208,7 @@ if rank == 0:
 		else:
 			# Dan had qfname commented out
 			qfname = 'q' + str(layer_idx + 1) + '_temp.npy'
-			old_q = np.load(os.path.join(out_path, qfname))
+			old_q = np.load(os.path.join('q_out', qfname))
 			old_col_weight = np.copy(col_weight)
 			old_q_size = np.copy(q_size)
 			old_class_map = np.copy(class_map)
@@ -269,7 +316,7 @@ if rank == 0:
 			other_idx += row_num
 
 		# write correlation data to Q-matrix file
-		np.save(os.path.join(out_path, qfname_temp), q)
+		np.save(os.path.join('q_out', qfname_temp), q)
 
 		del corr_data, q
 		del data_b, old_class_map, old_col_weight
@@ -334,7 +381,7 @@ if rank == 0:
 				else:
 					to_write = np.hstack((to_write, result))
 
-			np.save(os.path.join(out_path, 'w' + str(layer_idx) + '.npy'), to_write)
+			np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), to_write)
 			del to_write
 
 			old_col_weight = col_weight
@@ -345,8 +392,8 @@ if rank == 0:
 			q_max = -np.inf
 			q_min = np.inf
 
-			weights = np.load(os.path.join(out_path, 'w' + str(layer_idx) + '.npy'))
-			q = np.load(os.path.join(out_path, qfname_temp))
+			weights = np.load(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'))
+			q = np.load(os.path.join('q_out', qfname_temp))
 
 			other_idx = 0
 			for neuron_idx in range(old_q_size[0]):
@@ -380,16 +427,18 @@ if rank == 0:
 				del result
 				other_idx = other_idx + row_num
 
-			np.save(os.path.join(out_path, qfname), q_new)
+			np.save(os.path.join('q_out', qfname), q_new)
 		
 			del q_new
 		
 		else:
-			qfile = np.load(os.path.join(out_path, qfname_temp))
-			np.save(os.path.join(out_path, qfname), qfile)
+			if not os.path.isdir('q_out'):
+				os.makedirs('q_out')
+		
+			qfile = np.load(os.path.join('q_out', qfname_temp))
+			np.save(os.path.join('q_out', qfname), qfile)
 
 		# build information dictionary for this Q-matrix
-		'''
 		qs = {}
 		qs['range'] = np.linspace(q_min, q_max, num_thresholds)
 		qs['qfname'] = qfname
@@ -400,14 +449,13 @@ if rank == 0:
 
 		print('\nBroadcasting resulting Q (' + str(qs['size'][0]) + 'x' + str(qs['size'][1]) + ')')
 
-		
+		'''
 		# tell the other ranks about the Q-matrices
 		comm.bcast(qs, root=0)
 
 		# work on our subset of the data
 		r = classify(qs, layer_idx, )
 		'''
-		
 
 # rank is nonzero	
 else:
