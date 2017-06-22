@@ -10,6 +10,8 @@ from keras.engine.topology import Layer
 import numpy as np
 import tensorflow as tf
 
+sess = tf.Session()
+
 
 class Hebbian(Layer):
 	
@@ -39,15 +41,13 @@ class Hebbian(Layer):
 
 
 	def call(self, x):
-		x_shape = x.get_shape().as_list()
+		x_shape = tf.shape(x)
 		batch_size = tf.shape(x)[0]
-		new_x = tf.reshape(x, (batch_size, np.prod(x_shape[1:])))
-		correlation = new_x[:, :, np.newaxis] * new_x[:, :, np.newaxis]
-		activations = self.lmbda * K.dot(self.kernel, correlation)
-		self.kernel = self.eta * correlation
+		x = tf.reshape(x, (batch_size, tf.reduce_prod(x_shape[1:])))
+		correlation = tf.reduce_mean(x[:, :, np.newaxis] * x[:, np.newaxis, :], axis=0)
+		activations = self.lmbda * tf.matmul(self.kernel, correlation)
+		self.kernel = self.kernel + tf.multiply(self.eta, correlation)
 
-		print(tf.shape(activations))
-		print(self.kernel)
-		print(x_shape)
+		# print(tf.shape(activations).eval(session=sess))
 
-		return K.reshape(activations, tf.shape(x))
+		return K.reshape(activations, x_shape)
