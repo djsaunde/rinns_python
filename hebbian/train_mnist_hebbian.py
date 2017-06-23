@@ -75,10 +75,10 @@ for d in device_names:
 		# Build model
 		model = Sequential()
 		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		model.add(Hebbian(model.layers[-1].output_shape[1:]))
+		# model.add(Hebbian(model.layers[-1].output_shape[1:]))
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
-		# model.add(Hebbian(128))
+		model.add(Hebbian(model.layers[-1].output_shape[1:]))
 		# model.add(Dense(64, activation='relu'))
 
 		# Output layer

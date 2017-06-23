@@ -10,8 +10,6 @@ from keras.engine.topology import Layer
 import numpy as np
 import tensorflow as tf
 
-sess = tf.Session()
-
 
 class Hebbian(Layer):
 	
@@ -41,13 +39,20 @@ class Hebbian(Layer):
 
 
 	def call(self, x):
+		# get shape of input
 		x_shape = tf.shape(x)
-		batch_size = tf.shape(x)[0]
-		x = tf.reshape(x, (batch_size, tf.reduce_prod(x_shape[1:])))
-		correlation = tf.reduce_mean(x[:, :, np.newaxis] * x[:, np.newaxis, :], axis=0)
-		activations = self.lmbda * tf.matmul(self.kernel, correlation)
-		self.kernel = self.kernel + tf.multiply(self.eta, correlation)
 
-		# print(tf.shape(activations).eval(session=sess))
+		# reshape input to be flat along non-batch dimensions
+		x = tf.reshape(x, (x_shape[0], np.prod(x.get_shape().as_list()[1:])))
+		
+		# correlation = tf.reduce_mean(x[:, :, np.newaxis] * x[:, np.newaxis, :], axis=0)
+		
+		# calculate output based on current weights and input activations
+		y = self.lmbda * tf.multiply(self.kernel, tf.reduce_mean(tf.multiply(x, tf.transpose(x)), axis=0))
+		
+		# update weights based on activations (
+		corr = tf.reduce_mean(x[:, :, np.newaxis] * x[:, np.newaxis, :], axis=1)
+		self.kernel = self.kernel + self.eta * corr
 
-		return K.reshape(activations, x_shape)
+		return K.reshape(y, x_shape)
+

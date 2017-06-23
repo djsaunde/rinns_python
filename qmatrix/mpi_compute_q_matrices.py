@@ -9,14 +9,20 @@ import math
 import sys
 import os
 
+from mpi4py import MPI
+from pynvml import *
+from memory_profiler import profile
+
 np.set_printoptions(threshold=np.nan)
 
 # ignore Tensorflow CPU compilation warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-sess = tf.Session()
+# attempted workaround for cuda memory error - restricting tf memory allocation
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.20)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
-
+# Calculate correlation matrix between two matrices
 def corr(A,B):
     # Rowwise mean of input arrays & subtract from input arrays themeselves
     A_mA = A - A.mean(1)[:,None]
@@ -29,9 +35,10 @@ def corr(A,B):
     # Finally get corr coeff
     return np.dot(A_mA,B_mB.T)/np.sqrt(np.dot(ssA[:,None],ssB[None]))
 
-
-def classify(qs, layer_idx, netpath, mem, range):
-	result = None # TODO
+# Classify q-matrices
+#def classify(qs, layer_idx, netpath, mem, qsrange):
+def classify()
+	result = { 'accuracy':list() for x in range([qsrange])], 'confusion':[list() for x in range([qsrange])], 'prediction':[list() for x in range([qsrange])] }
 
 	# get the Q-matrix
 	q = np.load(qs['qfname'])
@@ -105,8 +112,13 @@ def classify(qs, layer_idx, netpath, mem, range):
 
 			if imstep < activations.shape[1]:
 				del gpu_activations
+	
+	[ _ , classification_index ] = max(classification)
+	result['accuracy'][classification_index] = np.mean(classification_index == labels)
+	result['confusion'][classification_index] = np.mean(classification_index == labels)
+	
 
-
+##################################################################################################
 # parse optional arguments from user
 parser = argparse.ArgumentParser(description='Compute the Q-matrices of all layers of a given neural network.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -125,22 +137,34 @@ elif use_weights.lower() == 'false':
 else:
 	raise Exception('Enter True or False (case insensitive)!')
 
-qmatrix_path = os.path.join('..', 'work', 'qmatrix', model_name)
-if not os.path.isdir(qmatrix_path):
-    os.makedirs(qmatrix_path)
+out_path = os.path.join('..', 'work', 'qmatrix', model_name)
+if not os.path.isdir(out_path):
+    os.makedirs(out_path)
+##################################################################################################
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 comm_size = comm.Get_size()
 
+print("RANK:",rank)
+print("SIZE:",comm_size)
+
 # load the network model from disk
 model_path = os.path.join('..', 'work', 'training', model_name, 'best_weights_' + best_criterion + '.hdf5')
 model = keras.models.load_model(model_path)
+# machine's name visible to others
+machine_name = os.uname()[1]
+# number of thresholds to try for each optimization
+num_thresholds = 100
 
-############################################
+# We want to figure out the machine every rank is on so machines on the same
+# rank can use different GPUs (assuming there is one GPU per rank)
+###################################################
 if rank == 0:
 	startqi = len(model.layers)
 	machine_names = np.array(range(comm_size))
+	machine_names[0] = machine_name
+	# comm_size = 1 on this computer so this loop doesn't execute
 	for idx in range(1, comm_size):
 		mrank = []
 		while len(mrank) == 0:
@@ -158,10 +182,16 @@ if rank == 0:
 else:
 	# Send our name (Machine name is passed)
 	# also probably wrong
-	comm.send(machine_name)
+	comm.send(machine_name, dest=1, tag=11)
 	# Get everyone else's names
-	machine_names = comm.recv(0, 6)
-#############################################
+	machine_names = comm.recv(0, 5)
+####################################################
+
+# Find number of machines in list with this machine's name
+ranks_on_this_machine = machine_names.count(machine_name)
+# Matlab code, not sure if necessary
+#gpu_num = find(ranks_on_this_machine == rank)
+#gpu_device = gpuDevice(gpu_num)
 
 memory = {}
 # This doesn't give the correct amount of available gpu memory, probably has to do with 'context
@@ -173,16 +203,29 @@ memory['total'] = nvmlDeviceGetMemoryInfo(handle).free
 print(memory['total'])
 nvmlShutdown()
 
-if memory['total'] < 2 ** 30:
-	raise Exception('Less than 1Gb GPU memory available.')
+# CANT GET ACTUAL AVAILABLE MEMORY FOR SOME REASON, SO IGNORING FOR NOW, IT WILL CRASH IF NO MEMORY
+#if memory['total'] < 2 ** 30:
+	#raise Exception('Less than 1Gb GPU memory available.')
 
 memory['reserved'] = memory['total'] * 0.85
 memory['q'] = memory['reserved'] * 0.5
 memory['activations'] = memory['reserved'] * 0.5
 
+print("Intialized rank %d out of %d, on processor %s" % (rank, comm_size, machine_name)) # using GPU %d, gpunum)
+
+# Clear memory we don't need from above calculations
+del machine_names, machine_name, ranks_on_this_machine #,gpu_num, gpu_device
+
+# Rank assigned to each subset of the problem
+subset_ranks = range(num_thresholds) % comm_size
+
+# Rank 0 does all of the q-matrix computation
 if rank == 0:
 	print(model.summary())
 
+	# Share network metadata (start_index and network? - no going to include network)
+	comm.bcast(startqi, root=0) 
+	
 	# get network metadata
 	num_layers = len(model.layers)
 	num_classes = model.layers[-1].output_shape[1]
@@ -208,7 +251,7 @@ if rank == 0:
 		else:
 			# Dan had qfname commented out
 			qfname = 'q' + str(layer_idx + 1) + '_temp.npy'
-			old_q = np.load(os.path.join('q_out', qfname))
+			old_q = np.load(os.path.join(out_path, qfname))
 			old_col_weight = np.copy(col_weight)
 			old_q_size = np.copy(q_size)
 			old_class_map = np.copy(class_map)
@@ -316,7 +359,7 @@ if rank == 0:
 			other_idx += row_num
 
 		# write correlation data to Q-matrix file
-		np.save(os.path.join('q_out', qfname_temp), q)
+		np.save(os.path.join(out_path, qfname_temp), q)
 
 		del corr_data, q
 		del data_b, old_class_map, old_col_weight
@@ -381,7 +424,7 @@ if rank == 0:
 				else:
 					to_write = np.hstack((to_write, result))
 
-			np.save(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'), to_write)
+			np.save(os.path.join(out_path, 'w' + str(layer_idx) + '.npy'), to_write)
 			del to_write
 
 			old_col_weight = col_weight
@@ -392,8 +435,8 @@ if rank == 0:
 			q_max = -np.inf
 			q_min = np.inf
 
-			weights = np.load(os.path.join('q_out', 'w' + str(layer_idx) + '.npy'))
-			q = np.load(os.path.join('q_out', qfname_temp))
+			weights = np.load(os.path.join(out_path, 'w' + str(layer_idx) + '.npy'))
+			q = np.load(os.path.join(out_path, qfname_temp))
 
 			other_idx = 0
 			for neuron_idx in range(old_q_size[0]):
@@ -427,16 +470,13 @@ if rank == 0:
 				del result
 				other_idx = other_idx + row_num
 
-			np.save(os.path.join('q_out', qfname), q_new)
+			np.save(os.path.join(out_path, qfname), q_new)
 		
 			del q_new
 		
 		else:
-			if not os.path.isdir('q_out'):
-				os.makedirs('q_out')
-		
-			qfile = np.load(os.path.join('q_out', qfname_temp))
-			np.save(os.path.join('q_out', qfname), qfile)
+			qfile = np.load(os.path.join(out_path, qfname_temp))
+			np.save(os.path.join(out_path, qfname), qfile)
 
 		# build information dictionary for this Q-matrix
 		qs = {}
@@ -449,9 +489,11 @@ if rank == 0:
 
 		print('\nBroadcasting resulting Q (' + str(qs['size'][0]) + 'x' + str(qs['size'][1]) + ')')
 
-		'''
 		# tell the other ranks about the Q-matrices
 		comm.bcast(qs, root=0)
+		
+		# prepare to receive everybody's results
+		classification = {}
 
 		# work on our subset of the data
 		r = classify(qs, layer_idx, )
