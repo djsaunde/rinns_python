@@ -10,13 +10,15 @@ from keras.engine.topology import Layer
 import numpy as np
 import tensorflow as tf
 
+np.set_printoptions(threshold=np.nan)
+
 sess = tf.Session()
 
 
 class Hebbian(Layer):
 	
 	
-	def __init__(self, output_dim, lmbda=1, eta=0.005, connectivity='all', **kwargs):
+	def __init__(self, output_dim, lmbda=1, eta=1.0, connectivity='random', **kwargs):
 		'''
 		Constructor for the Hebbian learning layer.
 
@@ -33,6 +35,19 @@ class Hebbian(Layer):
 
 		super(Hebbian, self).__init__(**kwargs)
 	
+	
+	def random_conn_init(self, shape, dtype=None):
+		print(shape)
+		A = np.random.random(shape)
+		A[A < 0.1] = 0
+		A = tf.constant(A)
+
+		return tf.cast(A, tf.float32)
+
+		idx = tf.where(tf.not_equal(A, 0))
+		sparse = tf.SparseTensor(idx, tf.gather_nd(A, idx), A.get_shape())
+		return sparse
+
 
 	def build(self, input_shape):
 		# Create weight variable for this layer.
@@ -43,11 +58,22 @@ class Hebbian(Layer):
 	def call(self, x):
 		x_shape = tf.shape(x)
 		batch_size = tf.shape(x)[0]
-		x = tf.reshape(x, (batch_size, tf.reduce_prod(x_shape[1:])))
-		correlation = tf.reduce_mean(x[:, :, np.newaxis] * x[:, np.newaxis, :], axis=0)
-		activations = self.lmbda * tf.matmul(self.kernel, correlation)
-		self.kernel = self.kernel + tf.multiply(self.eta, correlation)
 
-		# print(tf.shape(activations).eval(session=sess))
+		# reshape to (batch_size, product of other dimensions) shape
+		x = tf.reshape(x, (tf.reduce_prod(x_shape[1:]), batch_size))
 
+		# compute activations using Hebbian-like update rule
+		activations = self.lmbda * tf.matmul(self.kernel, x)
+
+		# sum contributions over each batch
+		batch_sum = np.divide(tf.reduce_sum(x, axis=1), tf.cast(batch_size, tf.float32))
+
+		# compute outer product of activations matrix with itself
+		outer_product = tf.matmul(batch_sum[:, np.newaxis], batch_sum[np.newaxis, :])	
+
+		# update the weight matrix of this layer
+		self.kernel = self.kernel + tf.multiply(self.eta, tf.matmul(self.kernel, outer_product))
+
+		# return properly-shaped computed activations
 		return K.reshape(activations, x_shape)
+

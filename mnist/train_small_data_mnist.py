@@ -4,6 +4,7 @@ File: train_mnist.py
 Purpose: Becoming familiar with Keras with a small
 		 convolutional neural network
 """
+
 import keras
 import sys, os
 import argparse
@@ -53,16 +54,16 @@ for d in device_names:
 
 		# If color channels are last parameter
 		# Image dimensions are 28x28
-		x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')
-		x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')
+		x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')[:1000, :, :, :]
+		x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')[:100, :, :, :]
 
 		# Normalize pixel values between 0 and 1 per channel
 		x_train /= 255
 		x_valid /= 255
 
 		# Convert class label values to one-hot vectors
-		y_train = keras.utils.to_categorical(y_train, num_classes)
-		y_valid = keras.utils.to_categorical(y_valid, num_classes)
+		y_train = keras.utils.to_categorical(y_train, num_classes)[:1000]
+		y_valid = keras.utils.to_categorical(y_valid, num_classes)[:100]
 
 		# Print out sample sizes
 		print("Training samples:", x_train.shape[0])

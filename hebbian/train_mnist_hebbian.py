@@ -10,6 +10,7 @@ import sys, os
 import argparse
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from keras import losses
 from keras.datasets import mnist
@@ -23,7 +24,7 @@ from hebbian import Hebbian
 # Suppress tensorflow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'mnist')
+train_path = os.path.join('..', 'work', 'training', 'mnist_hebbian')
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
 
@@ -57,16 +58,16 @@ for d in device_names:
 
 		# If color channels are last parameter
 		# Image dimensions are 28x28
-		x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')
-		x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')
+		x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')[:1000, :, :, :]
+		x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')[:100, :, :, :]
 
 		# Normalize pixel values between 0 and 1 per channel
 		x_train /= 255
 		x_valid /= 255
 
 		# Convert class label values to one-hot vectors
-		y_train = keras.utils.to_categorical(y_train, num_classes)
-		y_valid = keras.utils.to_categorical(y_valid, num_classes)
+		y_train = keras.utils.to_categorical(y_train, num_classes)[:1000]
+		y_valid = keras.utils.to_categorical(y_valid, num_classes)[:100]
 
 		# Print out sample sizes
 		print("Training samples:", x_train.shape[0])
@@ -75,22 +76,39 @@ for d in device_names:
 		# Build model
 		model = Sequential()
 		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		model.add(Hebbian(model.layers[-1].output_shape[1:]))
+		# model.add(Hebbian(model.layers[-1].output_shape[1:]))
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
-		# model.add(Hebbian(128))
-		# model.add(Dense(64, activation='relu'))
+		model.add(Hebbian(128))
+		model.add(Dense(64, activation='relu'))
 
 		# Output layer
 		model.add(Dense(num_classes, activation='softmax'))
 
 		# Choosing loss function and optimizer
 		model.compile(loss=keras.losses.categorical_crossentropy,
-					  optimizer=keras.optimizers.Adadelta(),
+					  optimizer=keras.optimizers.Adam(),
 					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
 model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=True)
 
 # fit the model using the defined 'model_checkpoint' callback
-model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
+history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
+
+# plot training and validation loss and accuracy curves
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('iteration')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('iteration')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
