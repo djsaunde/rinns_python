@@ -106,6 +106,7 @@ plt.ylabel('accuracy')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.savefig(os.path.join(plots_path, 'small_data_mnist_accuracy.png'))
+plt.clf()
 
 # summarize history for loss
 plt.plot(history.history['loss'])
