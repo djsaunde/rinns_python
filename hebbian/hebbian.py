@@ -18,7 +18,7 @@ sess = tf.Session()
 class Hebbian(Layer):
 	
 	
-	def __init__(self, output_dim, lmbda=1, eta=0.01, connectivity='random', **kwargs):
+	def __init__(self, output_dim, lmbda=1, eta=0.0001, connectivity='random', **kwargs):
 		'''
 		Constructor for the Hebbian learning layer.
 
@@ -45,6 +45,7 @@ class Hebbian(Layer):
 	def build(self, input_shape):
 		# Create weight variable for this layer.
 		self.kernel = self.add_weight(name='kernel', shape=(np.prod(input_shape[1:]), np.prod(self.output_dim)), initializer='uniform', trainable=False)
+		self.kernel = self.kernel * tf.diag(tf.zeros(self.output_dim))
 		super(Hebbian, self).build(input_shape)
 
 
@@ -56,17 +57,19 @@ class Hebbian(Layer):
 		x = tf.reshape(x, (tf.reduce_prod(x_shape[1:]), batch_size))
 
 		# compute activations using Hebbian-like update rule
-		activations = self.lmbda * tf.matmul(self.kernel, x)
-
-		# sum contributions over each batch
-		batch_sum = np.divide(tf.reduce_sum(x, axis=1), tf.cast(batch_size, tf.float32))
+		activations = x + self.lmbda * tf.matmul(self.kernel, x)
 
 		# compute outer product of activations matrix with itself
-		outer_product = tf.matmul(batch_sum[:, np.newaxis], batch_sum[np.newaxis, :])	
+		outer_product = tf.matmul(tf.expand_dims(x, 1), tf.expand_dims(x, 0))
 
 		# update the weight matrix of this layer
-		self.kernel = self.kernel + tf.multiply(self.eta, outer_product)
+		self.kernel = self.kernel + tf.multiply(self.eta, tf.reduce_mean(outer_product, axis=2))
+		self.kernel = self.kernel * tf.diag(tf.zeros(self.output_dim))
 
-		# return properly-shaped computed activations
 		return K.reshape(activations, x_shape)
 
+
+	def get_config(self):
+		config = { 'lmbda' : self.lmbda, 'connectivity' : self.connectivity, 'eta' : self.eta }
+		base_config = super(Hebbian, self).get_config()
+		return dict(list(base_config.items()) + list(config.items()))

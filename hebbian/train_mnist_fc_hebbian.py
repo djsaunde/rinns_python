@@ -24,7 +24,7 @@ from hebbian import Hebbian
 # Suppress tensorflow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'mnist_hebbian')
+train_path = os.path.join('..', 'work', 'training', 'mnist_fc_hebbian')
 plots_path = os.path.join('..', 'plots')
 
 if not os.path.isdir(train_path):
@@ -79,13 +79,10 @@ for d in device_names:
 
 		# Build model
 		model = Sequential()
-		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		# model.add(Hebbian(model.layers[-1].output_shape[1:]))
-		model.add(Flatten())
-		model.add(Dense(128, activation='relu'))
-		model.add(Hebbian(model.layers[-1].output_shape[1:]))
-		model.add(Dense(64, activation='relu'))
-
+		model.add(Flatten(input_shape=x_train.shape[1:]))
+		model.add(Dense(784, activation='relu'))
+		model.add(Hebbian(784))
+	
 		# Output layer
 		model.add(Dense(num_classes, activation='softmax'))
 
@@ -95,7 +92,7 @@ for d in device_names:
 					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
@@ -107,7 +104,7 @@ plt.title('model accuracy')
 plt.ylabel('accuracy')
 plt.xlabel('iteration')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig(os.path.join(plots_path, 'mnist_hebbian_accuracy.png'))
+plt.savefig(os.path.join(plots_path, 'mnist_fc_hebbian_accuracy.png'))
 plt.clf()
 
 # summarize history for loss
@@ -117,5 +114,5 @@ plt.title('model loss')
 plt.ylabel('loss')
 plt.xlabel('iteration')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig(os.path.join(plots_path, 'mnist_hebbian_loss.png'))
+plt.savefig(os.path.join(plots_path, 'mnist_fc_hebbian_loss.png'))
 
