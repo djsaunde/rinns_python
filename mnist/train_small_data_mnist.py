@@ -9,6 +9,7 @@ import keras
 import sys, os
 import argparse
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from keras import losses
 from keras.datasets import mnist
@@ -20,9 +21,13 @@ from keras.callbacks import ModelCheckpoint
 # Suppress tensorflow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'mnist')
+train_path = os.path.join('..', 'work', 'training', 'small_data_mnist')
+plots_path = os.path.join('..', 'plots')
+
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
+if not os.path.isdir(plots_path):
+	os.makedirs(plots_path)
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -101,6 +106,8 @@ plt.ylabel('accuracy')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'small_data_mnist_accuracy.png'))
+
 # summarize history for loss
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
@@ -109,3 +116,4 @@ plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'small_data_mnist_loss.png'))

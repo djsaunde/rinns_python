@@ -18,7 +18,7 @@ sess = tf.Session()
 class Hebbian(Layer):
 	
 	
-	def __init__(self, output_dim, lmbda=1, eta=1.0, connectivity='random', **kwargs):
+	def __init__(self, output_dim, lmbda=1, eta=0.01, connectivity='random', **kwargs):
 		'''
 		Constructor for the Hebbian learning layer.
 
@@ -37,16 +37,9 @@ class Hebbian(Layer):
 	
 	
 	def random_conn_init(self, shape, dtype=None):
-		print(shape)
 		A = np.random.random(shape)
 		A[A < 0.1] = 0
-		A = tf.constant(A)
-
-		return tf.cast(A, tf.float32)
-
-		idx = tf.where(tf.not_equal(A, 0))
-		sparse = tf.SparseTensor(idx, tf.gather_nd(A, idx), A.get_shape())
-		return sparse
+		return tf.constant(A, dtype=tf.float32)
 
 
 	def build(self, input_shape):
@@ -72,7 +65,7 @@ class Hebbian(Layer):
 		outer_product = tf.matmul(batch_sum[:, np.newaxis], batch_sum[np.newaxis, :])	
 
 		# update the weight matrix of this layer
-		self.kernel = self.kernel + tf.multiply(self.eta, tf.matmul(self.kernel, outer_product))
+		self.kernel = self.kernel + tf.multiply(self.eta, outer_product)
 
 		# return properly-shaped computed activations
 		return K.reshape(activations, x_shape)

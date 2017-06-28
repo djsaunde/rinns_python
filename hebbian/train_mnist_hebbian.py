@@ -25,8 +25,12 @@ from hebbian import Hebbian
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 train_path = os.path.join('..', 'work', 'training', 'mnist_hebbian')
+plots_path = os.path.join('..', 'plots')
+
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
+if not os.path.isdir(plots_path):
+	os.makedirs(plots_pat)
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -104,6 +108,8 @@ plt.ylabel('accuracy')
 plt.xlabel('iteration')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'mnist_hebbian_accuracy.png'))
+
 # summarize history for loss
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
@@ -112,3 +118,5 @@ plt.ylabel('loss')
 plt.xlabel('iteration')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'mnist_hebbian_loss.png'))
+

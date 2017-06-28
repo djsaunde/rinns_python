@@ -8,6 +8,7 @@ import keras
 import sys, os
 import argparse
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from keras import losses
 from keras.datasets import mnist
@@ -20,8 +21,12 @@ from keras.callbacks import ModelCheckpoint
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 train_path = os.path.join('..', 'work', 'training', 'mnist')
+plots_path = os.path.join('..', 'plots')
+
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
+if not os.path.isdir(plots_path):
+	os.makedirs(plots_path)
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -71,13 +76,9 @@ for d in device_names:
 		# Build model
 		model = Sequential()
 		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		#model.add(Conv2D(64, (3, 3), activation='relu'))
-		#model.add(MaxPooling2D((2, 2)))
-		#model.add(Dropout(0.25))
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
-		#model.add(Dropout(0.5))
-
+		model.add(Dense(64, activation='relu'))
 		# Output layer
 		model.add(Dense(num_classes, activation='softmax'))
 
@@ -100,6 +101,7 @@ plt.ylabel('accuracy')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'mnist_accuracy.png'))
 # summarize history for loss
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
@@ -108,3 +110,5 @@ plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.show()
+plt.savefig(os.path.join(plots_path, 'mnist_loss.png'))
+
