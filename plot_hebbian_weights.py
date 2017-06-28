@@ -37,4 +37,4 @@ for f in os.listdir(weights_path):
 	# get only the weights of the Hebbian learning layers
 	for layer in model.layers():
 		if 'hebbian' in layer.name:
-			hebbian_weights
+			hebbian_weights.append(layer.weights)
