@@ -105,7 +105,6 @@ plt.title('model accuracy')
 plt.ylabel('accuracy')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.show()
 plt.savefig(os.path.join(plots_path, 'small_data_mnist_accuracy.png'))
 
 # summarize history for loss
@@ -115,5 +114,4 @@ plt.title('model loss')
 plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.show()
 plt.savefig(os.path.join(plots_path, 'small_data_mnist_loss.png'))
