@@ -93,7 +93,7 @@ for d in device_names:
 					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=True)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
