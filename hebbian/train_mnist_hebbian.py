@@ -34,8 +34,11 @@ if not os.path.isdir(train_path):
 if not os.path.isdir(plots_path):
 	os.makedirs(plots_path)
 
+for filename in os.listdir(train_path):
+	os.remove(os.path.join(train_path, filename))
+
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
-parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
+parser.add_argument('--hardware', type=str, default='gpu', help='Use of cpu, gpu, or 2gpu currently supported.')
 parser.add_argument('--batch_size', type=int, default=128, help='Number of training / validation examples per minibatch.')
 parser.add_argument('--num_epochs', type=int, default=10, help='Number of epochs (passes through training dataset) for which to train the network.')
 parser.add_argument('--best_criterion', type=str, default='val_loss', help='Criterion to consider when choosing the "best" model. Can also \
@@ -86,7 +89,6 @@ for d in device_names:
 		# Build model
 		model = Sequential()
 		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		# model.add(Hebbian(model.layers[-1].output_shape[1:], lmbda, eta, connectivity))
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
 		model.add(Hebbian(model.layers[-1].output_shape[1:], lmbda, eta, connectivity))

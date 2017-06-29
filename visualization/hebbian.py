@@ -18,7 +18,7 @@ sess = tf.Session()
 class Hebbian(Layer):
 	
 	
-	def __init__(self, output_dim, lmbda, eta, connectivity, **kwargs):
+	def __init__(self, output_dim=None, lmbda=None, eta=None, connectivity=None, **kwargs):
 		'''
 		Constructor for the Hebbian learning layer.
 
