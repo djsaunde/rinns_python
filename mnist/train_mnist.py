@@ -1,12 +1,14 @@
-"""
-Author: Ryan McCormick
-File: train_mnist.py
-Purpose: Becoming familiar with Keras with a small
-		 convolutional neural network
-"""
+'''
+Implement a convolutonal neural network with Hebbian learning layers
+which learns to classify the MNIST handwritten digit dataset.
+'''
+
+__author__ = 'Dan Saunders'
+
 import keras
 import sys, os
 import argparse
+import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -20,8 +22,10 @@ from keras.callbacks import ModelCheckpoint
 # Suppress tensorflow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'mnist')
-plots_path = os.path.join('..', 'plots')
+model_name = 'mnist'
+
+train_path = os.path.join('..', 'work', 'training', model_name)
+plots_path = os.path.join('..', 'plots', model_name)
 
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
@@ -79,36 +83,35 @@ for d in device_names:
 		model.add(Flatten())
 		model.add(Dense(128, activation='relu'))
 		model.add(Dense(64, activation='relu'))
+
 		# Output layer
 		model.add(Dense(num_classes, activation='softmax'))
 
 		# Choosing loss function and optimizer
 		model.compile(loss=keras.losses.categorical_crossentropy,
-					  optimizer=keras.optimizers.Adadelta(),
+					  optimizer=keras.optimizers.Adam(),
 					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
 
-# plot training and validation loss and accuracy curves
-plt.plot(history.history['acc'])
-plt.plot(history.history['val_acc'])
-plt.title('model accuracy')
-plt.ylabel('accuracy')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.savefig(os.path.join(plots_path, 'mnist_accuracy.png'))
-plt.clf()
+fig, axes = plt.subplots(2, sharex=True)
+axes[0].plot(range(1, num_epochs + 1), history.history['acc'], '*:')
+axes[0].plot(range(1, num_epochs + 1), history.history['val_acc'], '*:')
+axes[0].set_ylabel('accuracy')
+axes[1].set_xlabel('epoch')
+axes[1].set_xticks(range(1, num_epochs + 1))
+axes[0].legend(['train', 'validation'], loc='lower right')
+axes[0].set_title(model_name + ' accuracy and loss')
+axes[1].plot(range(1, num_epochs + 1), history.history['loss'], '*:')
+axes[1].plot(range(1, num_epochs + 1), history.history['val_loss'], '*:')
+axes[1].set_ylabel('loss')
+axes[1].set_xlabel('epoch')
+axes[1].set_xticks(range(1, num_epochs + 1))
+axes[1].legend(['train', 'validation'], loc='upper right')
 
-# summarize history for loss
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.savefig(os.path.join(plots_path, 'mnist_loss.png'))
+fig.savefig(os.path.join(plots_path, '%d_accuracy_loss.png' % num_epochs))
 
