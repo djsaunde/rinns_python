@@ -6,6 +6,7 @@ import keras
 import sys, os
 import argparse
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from keras import losses
 from keras.datasets import cifar10
@@ -17,9 +18,15 @@ from keras.callbacks import ModelCheckpoint
 
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-train_path = os.path.join('..', 'work', 'training', 'cifar10_lenet')
+model_name = 'cifar10_lenet'
+
+train_path = os.path.join('..', 'work', 'training', model_name)
+plots_path = os.path.join('..', 'plots', model_name)
+
 if not os.path.isdir(train_path):
 	os.makedirs(train_path)
+if not os.path.isdir(plots_path):
+	os.makedirs(plots_path)
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -95,8 +102,25 @@ for d in device_names:
 		x_test /= 255
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'best_weights_' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=True)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
-model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_test, y_test), shuffle=True, callbacks=[model_checkpoint])
+history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_test, y_test), shuffle=True, callbacks=[model_checkpoint])
+
+fig, axes = plt.subplots(2, sharex=True)
+axes[0].plot(range(1, num_epochs + 1), history.history['acc'], '*:')
+axes[0].plot(range(1, num_epochs + 1), history.history['val_acc'], '*:')
+axes[0].set_ylabel('accuracy')
+axes[1].set_xlabel('epoch')
+axes[1].set_xticks(range(1, num_epochs + 1)) 
+axes[0].legend(['train', 'validation'], loc='lower right')
+axes[0].set_title(model_name + ' accuracy and loss')
+axes[1].plot(range(1, num_epochs + 1), history.history['loss'], '*:')
+axes[1].plot(range(1, num_epochs + 1), history.history['val_loss'], '*:')
+axes[1].set_ylabel('loss')
+axes[1].set_xlabel('epoch')
+axes[1].set_xticks(range(1, num_epochs + 1)) 
+axes[1].legend(['train', 'validation'], loc='upper right')
+
+fig.savefig(os.path.join(plots_path, '%d_accuracy_loss.png' % (num_epochs)))
 
