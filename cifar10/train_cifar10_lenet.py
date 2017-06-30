@@ -80,13 +80,6 @@ for d in device_names:
 		model.add(Dense(64))
 		model.add(Activation('relu'))
 
-		#print(model.layers)
-		#for layer in model.layers:
-			#print(layer.input_shape)
-			#print(layer.output_shape)
-			#print(layer.weights)
-			#print('\n')
-
 		"""Block 5"""
 		model.add(Dense(10)) 
 

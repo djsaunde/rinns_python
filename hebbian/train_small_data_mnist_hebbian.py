@@ -26,14 +26,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 model_name = 'small_data_mnist_hebbian'
 
-train_path = os.path.join('..', 'work', 'training', model_name)
-plots_path = os.path.join('..', 'plots', model_name)
-
-if not os.path.isdir(train_path):
-	os.makedirs(train_path)
-if not os.path.isdir(plots_path):
-	os.makedirs(plots_path)
-
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='cpu', help='Use of cpu, gpu, or 2gpu currently supported.')
 parser.add_argument('--batch_size', type=int, default=128, help='Number of training / validation examples per minibatch.')
@@ -49,6 +41,14 @@ args = parser.parse_args()
 
 hardware, batch_size, num_epochs, best_criterion, lmbda, eta, connectivity, num_train, num_valid = \
 		args.hardware, args.batch_size, args.num_epochs, args.best_criterion, args.lmbda, args.eta, args.connectivity, args.num_train, args.num_valid
+
+train_path = os.path.join('..', 'work', 'training', model_name, '_'.join([str(lmbda), str(eta), connectivity, str(num_train), str(num_valid)]))
+plots_path = os.path.join('..', 'plots', model_name)
+
+if not os.path.isdir(train_path):
+	os.makedirs(train_path)
+if not os.path.isdir(plots_path):
+	os.makedirs(plots_path)
 
 ### Pick CPU or GPU ###
 if hardware == "cpu":
@@ -103,7 +103,7 @@ for d in device_names:
 					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-' + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-%g-%g-%s-%d-%d-' % (lmbda, eta, connectivity, num_train, num_valid) + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])

@@ -1,6 +1,6 @@
 '''
 Implement a convolutonal neural network with Hebbian learning layers
-which learns to classify the MNIST handwritten digit dataset.
+which learns to classify the objects found in the CIFAR-10 dataset.
 '''
 
 __author__ = 'Dan Saunders'
@@ -13,10 +13,10 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from keras import losses
-from keras.datasets import mnist
+from keras.datasets import cifar10
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
 from keras.callbacks import ModelCheckpoint
 
 from hebbian import Hebbian
@@ -24,7 +24,7 @@ from hebbian import Hebbian
 # Suppress tensorflow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-model_name = 'mnist_hebbian'
+model_name = 'cifar_hebbian'
 
 parser = argparse.ArgumentParser(description='Train a convolutional neural network on the CIFAR-10 dataset.')
 parser.add_argument('--hardware', type=str, default='gpu', help='Use of cpu, gpu, or 2gpu currently supported.')
@@ -64,46 +64,59 @@ else:
 ### Run code on chosen devices ###
 for d in device_names:
 	with tf.device(d):
-		num_classes = 10
+		(x_train, y_train), (x_valid, y_valid) = cifar10.load_data()
 
-		# mnist.load_data() returns 2 tuples split into training/testing
-		(x_train, y_train), (x_valid, y_valid) = mnist.load_data()
+		# Checking data sizes
+		print('x_train shape:', x_train.shape)
+		print(x_train.shape[0], 'train samples')
+		print(x_valid.shape[0], 'test samples')
 
-		# If color channels are last parameter
-		# Image dimensions are 28x28
-		x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')
-		x_valid = x_valid.reshape(x_valid.shape[0], 28, 28, 1).astype('float32')
+		# Convert class vectors to binary class matrices
+		y_train = keras.utils.to_categorical(y_train, 10)
+		y_valid = keras.utils.to_categorical(y_valid, 10)
 
-		# Normalize pixel values between 0 and 1 per channel
+		# Feed-forward
+		model = Sequential()
+
+		"""Block 1"""
+		# Filters(32), Slider_size(5,5), input_shape(32,32,3)
+		model.add(Conv2D(32, (5, 5), strides=(1,1), padding='same', input_shape=x_train.shape[1:]))
+		model.add(MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='same'))
+		model.add(Activation('relu'))
+
+		"""Block 2"""
+		model.add(Conv2D(32, (5, 5), strides=(1,1), padding='same'))
+		model.add(Activation('relu'))
+		model.add(AveragePooling2D(pool_size=(3, 3), strides=(2,2), padding='same'))
+
+		"""Block 3"""
+		model.add(Conv2D(64, (5, 5), strides=(1,1), padding='same'))
+		model.add(Activation('relu'))
+		model.add(AveragePooling2D(pool_size=(3, 3), strides=(2,2), padding='same'))
+
+		"""Block 4"""
+		model.add(Flatten())
+		model.add(Dense(64))
+		model.add(Activation('relu'))
+
+		"""Block 5"""
+		model.add(Dense(10)) 
+
+		"""Loss Layer"""
+		model.add(Activation('softmax'))
+
+		"""Optimizer"""
+		model.compile(loss=losses.categorical_crossentropy, optimizer='adam', metrics=['accuracy'])
+
+		x_train = x_train.astype('float32')
+		x_valid = x_valid.astype('float32')
 		x_train /= 255
 		x_valid /= 255
 
-		# Convert class label values to one-hot vectors
-		y_train = keras.utils.to_categorical(y_train, num_classes)
-		y_valid = keras.utils.to_categorical(y_valid, num_classes)
-
-		# Print out sample sizes
-		print("Training samples:", x_train.shape[0])
-		print("Test samples:", x_valid.shape[0])
-
-		# Build model
-		model = Sequential()
-		model.add(Conv2D(32, (3, 3), activation='relu', input_shape=x_train.shape[1:]))
-		model.add(Flatten())
-		model.add(Dense(128, activation='relu'))
-		model.add(Hebbian(model.layers[-1].output_shape[1:], lmbda, eta, connectivity))
-		model.add(Dense(64, activation='relu'))
-
-		# Output layer
-		model.add(Dense(num_classes, activation='softmax'))
-
-		# Choosing loss function and optimizer
-		model.compile(loss=keras.losses.categorical_crossentropy,
-					  optimizer=keras.optimizers.Adam(),
-					  metrics=['accuracy'])
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-%g-%g-%s-' % (lmbda, eta, connectivity) + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-%g-%g-%s-' % \
+								(lmbda, eta, connectivity) + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
