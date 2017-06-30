@@ -69,7 +69,6 @@ class Hebbian(Layer):
 		return K.reshape(activations, x_shape)
 
 
-	def get_config(self):	
-		config = { 'lmbda' : self.lmbda, 'connectivity' : self.connectivity, 'eta' : self.eta }
-		base_config = super(Hebbian, self).get_config()
-		return dict(list(base_config.items()) + list(config.items()))
+	def get_config(self):
+		return dict(list(base_config.items()) + list({'lmbda' : self.lmbda, 'eta' : self.eta, 'connectivity' : self.connectivity}))
+		# return cls(**config)
