@@ -35,12 +35,14 @@ parser.add_argument('--best_criterion', type=str, default='val_loss', help='Crit
 parser.add_argument('--lmbda', type=float, default=1.0, help='Hebbian learning layer lateral connection efficacy parameter.')
 parser.add_argument('--eta', type=float, default=0.0005, help='Hebbian learning layer learning rate.')
 parser.add_argument('--connectivity', type=str, default='all', help='Hebbian learning layer connectivity pattern.')
+parser.add_argument('--connectivity_prob', type=float, default='0.25', help='Probability that two neurons in a Hebbian layer are laterally connected.')
 args = parser.parse_args()
 
-hardware, batch_size, num_epochs, best_criterion, lmbda, eta, connectivity = \
-					args.hardware, args.batch_size, args.num_epochs, args.best_criterion, args.lmbda, args.eta, args.connectivity
+hardware, batch_size, num_epochs, best_criterion, lmbda, eta, connectivity, connectivity_prob = \
+	args.hardware, args.batch_size, args.num_epochs, args.best_criterion, args.lmbda, args.eta, args.connectivity, args.connectivity_prob
 
-train_path = os.path.join('..', 'work', 'training', model_name, '_'.join([str(lmbda), str(eta), str(connectivity)]))
+train_path = os.path.join('..', 'work', 'training', model_name, \
+		'_'.join([str(lmbda), str(eta), str(connectivity), str(connectivity_prob)]))
 plots_path = os.path.join('..', 'plots', model_name)
 
 if not os.path.isdir(train_path):
@@ -98,6 +100,7 @@ for d in device_names:
 		model.add(Flatten())
 		model.add(Dense(64))
 		model.add(Activation('relu'))
+		model.add(Hebbian(model.layers[-1].output_shape[1:], lmbda, eta, connectivity, connectivity_prob))
 
 		"""Block 5"""
 		model.add(Dense(10)) 
@@ -115,8 +118,8 @@ for d in device_names:
 
 
 # check model checkpointing callback which saves only the "best" network according to the 'best_criterion' optional argument (defaults to validation loss)
-model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-%g-%g-%s-' % \
-								(lmbda, eta, connectivity) + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
+model_checkpoint = ModelCheckpoint(os.path.join(train_path, 'weights-{epoch:02d}-%g-%g-%s-%g' % \
+		(lmbda, eta, connectivity, connectivity_prob) + best_criterion + '.hdf5'), monitor=best_criterion, save_best_only=False)
 
 # fit the model using the defined 'model_checkpoint' callback
 history = model.fit(x_train, y_train, batch_size, epochs=num_epochs, validation_data=(x_valid, y_valid), shuffle=True, callbacks=[model_checkpoint])
@@ -128,7 +131,8 @@ axes[0].set_ylabel('accuracy')
 axes[1].set_xlabel('epoch')
 axes[1].set_xticks(range(1, num_epochs + 1))
 axes[0].legend(['train', 'validation'], loc='lower right')
-axes[0].set_title(model_name + ' accuracy and loss\n(lambda = %g, eta = %g, connectivity = %s)' % (lmbda, eta, connectivity))
+axes[0].set_title(model_name + ' accuracy and loss\n(lambda = %g, eta = %g, connectivity = %s, prob. connect = %g)' % \
+																				(lmbda, eta, connectivity, connectivity_prob))
 axes[1].plot(range(1, num_epochs + 1), history.history['loss'], '*:')
 axes[1].plot(range(1, num_epochs + 1), history.history['val_loss'], '*:')
 axes[1].set_ylabel('loss')
@@ -136,5 +140,5 @@ axes[1].set_xlabel('epoch')
 axes[1].set_xticks(range(1, num_epochs + 1))
 axes[1].legend(['train', 'validation'], loc='upper right')
 
-fig.savefig(os.path.join(plots_path, '%d_%g_%g_%s_accuracy_loss.png' % (num_epochs, lmbda, eta, connectivity)))
+fig.savefig(os.path.join(plots_path, '%d_%g_%g_%s_%g_accuracy_loss.png' % (num_epochs, lmbda, eta, connectivity, connectivity_prob)))
 
